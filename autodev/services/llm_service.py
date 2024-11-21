@@ -6,7 +6,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-def call_llm(prompt, temperature=0, max_tokens=16384):
+def call_llm(prompt, model='o1-mini', max_completion_tokens=32768):
     api_key = os.getenv('OPENAI_API_KEY')
     if not api_key:
         raise ValueError("OPENAI_API_KEY environment variable not set.")
@@ -15,11 +15,9 @@ def call_llm(prompt, temperature=0, max_tokens=16384):
     try:
         logger.debug(f"Sending prompt to LLM:\n{prompt}")
         response = openai.chat.completions.create(
-            model="gpt-4o",  # Use "gpt-4" if available
+            model=model,
             messages=[{"role": "user", "content": prompt}],
-           
-            max_tokens=max_tokens,
-            temperature=temperature,
+            max_completion_tokens=max_completion_tokens,
         )
         content = response.choices[0].message.content.strip()
         logger.debug(f"Received response from LLM:\n{content}")

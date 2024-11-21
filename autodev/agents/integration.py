@@ -1,40 +1,50 @@
+# autodev/agents/integration.py
+
 from typing import Dict, Any
 import logging
 import os
-from ..core.agent import Agent
-from ..core.types import Result
-from ..prompts.agent_prompts import get_prompt
+from autodev.core.agent import Agent
+from autodev.core.types import Result
+from autodev.prompts.agent_prompts import get_prompt
+from autodev.services.git_manager import GitManagerService
 
 logger = logging.getLogger(__name__)
 
-def integrate_tasks(context_variables: Dict[str, Any]) -> Result:
-    tested_tasks = context_variables.get("tested_tasks", [])
-    project_dir = context_variables.get('project_dir', os.path.join(os.getcwd(), 'output', 'project'))
-    integrated_code = ""
+class IntegrationAgent(Agent):
+    def __init__(self):
+        super().__init__(
+            name="IntegrationAgent",
+            instructions=get_prompt("integration_agent"),
+            functions=[self.integrate_tasks],
+        )
 
-    logger.info("Integrating tested tasks.")
-    for task in tested_tasks:
-        integrated_code += f"\n# Task {task['task_id']}: {task['description']}\n"
-        integrated_code += task['code']
-        integrated_code += "\n# Tests\n"
-        integrated_code += task['tests']
-    
-    # Save the integrated code to a file
-    integrated_file_path = os.path.join(project_dir, 'integrated_code.py')
-    with open(integrated_file_path, 'w') as integrated_file:
-        integrated_file.write(integrated_code)
-    logger.info(f"Integrated code saved to {integrated_file_path}")
+    def integrate_tasks(self, context_variables: Dict[str, Any]) -> Result:
+        tested_tasks = context_variables.get("tested_tasks", [])
+        project_dir = context_variables.get(
+            "project_dir", os.path.join(os.getcwd(), "output", "project")
+        )
 
-    context_variables['integrated_code'] = integrated_code
-    context_variables['integrated_file_path'] = integrated_file_path
-    return Result(
-        value="Tasks integrated.",
-        context_variables=context_variables,
-        agent='DeploymentAgent'
-    )
+        git_manager = GitManagerService(repo_path=project_dir)
+        # Pull latest changes
+        git_manager.pull()
 
-integration_agent = Agent(
-    name="IntegrationAgent",
-    instructions=get_prompt("integration_agent"),
-    functions=[integrate_tasks]
-)
+        logger.info("Integrating tested tasks.")
+        # In this simplified example, assume that code is already integrated via Git commits
+        # Additional integration steps can be added if necessary
+
+        # Commit any integration changes
+        git_manager.add(".")
+        git_manager.commit("Integrated all tasks")
+
+        # Push changes to remote (if remote is set)
+        try:
+            git_manager.push()
+        except Exception as e:
+            logger.error(f"Git push failed: {e}")
+
+        logger.info("All tasks integrated.")
+        return Result(
+            value="Tasks integrated.",
+            context_variables=context_variables,
+            agent="DeploymentAgent",
+        )
